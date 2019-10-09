@@ -1,5 +1,8 @@
 <?php
 //php info
+date_default_timezone_set("Asia/Seoul");
+echo date( "Y-m-d H:i:s" , time() );
+echo "       ";
 $mysql_hostname = 'localhost';
 $mysql_username = 'root';
 $mysql_password = 'abc41641';
@@ -9,60 +12,64 @@ $mysql_database = 'test1';
 $connect = new mysqli($mysql_hostname, $mysql_username, $mysql_password, $mysql_database);
 //DB연결 확인
 if($connect->connect_errno){
-echo '[연결실패] : '.$connect->connect_error.'<br>';
+  echo '[연결실패] : '.$connect->connect_error.'      ';
 } else {
-echo 'sucess';
+  echo 'sucess      ';
 }
 
-
-$User_Card_Num = $_GET['code'];         //찍힌 사용자 ID
+$Current_User = $_GET['code'];         //찍힌 사용자 carD
 $Machine_ID = $_GET['Machine_ID'];   //찍은 세탁기 ID
-echo $Machine_ID;
 
-$query = "select Card_Num FROM Machine_Table WHERE ID = $Machine_ID";//해당 세탁기 예약자 정보
-$result = $connect->query($query);  //쿼리실행
-$Booker_ID = mysqli_fetch_array($result);//실행된 쿼리값을 읽음
-//echo $Booker_ID[0];
+//echo $Current_User;
+//echo $Machine_ID;
 
+$query = "select EndTime FROM machine_book WHERE MachineID_id = $Machine_ID ORDER BY id DESC LIMIT 1";//ENDTIME불러오기
+$result = $connect->query($query); //쿼리실행
+$Machine_EndTime = mysqli_fetch_array($result);
 
-if ($Booker_ID[0] == $User_Card_Num) {//찍은 카드가 예약자 정보와 같은지
-  $query2 = "update Machine_Table set Using_Stat = 1, User_ID = '$User_Card_Num', Start_Time = NOW() WHERE ID = $Machine_ID"; //해당 세탁기 정보 업뎃
-  $connect->query($query2);
-  echo "match";
-}
-else {
-  echo "false";
+//echo $Machine_EndTime[0];
+$Current_Time = date( "Y-m-d H:i:s" , time() );
+$query2 = "select UserId_id FROM machine_book WHERE MachineID_id = $Machine_ID ORDER BY id DESC LIMIT 1";//해당 세탁기 예약자 id
+$result2 = $connect->query($query2);  //쿼리실행
+$Booker_ID = mysqli_fetch_array($result2);//실행된 쿼리값을 읽
 
-}
+//  echo $Booker_ID[0];
 
-
-
-
-
-
-
-
+$query3 = "select CardId FROM account_user WHERE id = $Booker_ID[0]"; //예약자 id에 해당하는 카드번호
+$result3 = $connect->query($query3);  //쿼리실행
+$Booker_Card = mysqli_fetch_array($result3);//실행된 쿼리값을 읽음
 /*
-
-if ($User_penalty = ) {
-  // code...
-}
- }
-
- do {  //맨 마지막 레코드를 읽는 쿼리
-$query3 = "select * from temp order by no desc limit 1;";
-  $result = $connect->query($query3);  //쿼리실행
-  $row = mysqli_fetch_object($result); //실행된 쿼리값을 읽음
- } while($row->humidity == 0);
-
- echo date("Y-m-d H:i:s") . "<br />\n";  //날짜와 시간 표시
- echo "$row->no  ";
- echo "$row->humidity  ";
- echo "$row->temperature";
- if($row->temperature>27) { //온도가 27도 넘으면 경보음 울림(로컬 컴퓨터 하단경로에 MP3파일 넣을 것)
-echo '<embed src="c:\test.mp3" loop=-1> </embed>';
- }
-
-//하단 자바스크립트: 웹페이지 자동 REFRESH기능
+echo $Booker_Card[0];
+echo $Current_Time;
 */
+$query4 = "select ValidTime FROM machine_book WHERE MachineID_id = $Machine_ID ORDER BY id DESC LIMIT 1";
+$result4 = $connect->query($query4);  //쿼리실행
+$ValidTime = mysqli_fetch_array($result4);//실행된 쿼리값을 읽음
+$UsableTime = date("Y-m-d H:i:s", strtotime('-10 minutes', strtotime($ValidTime[0])));
+
+$query5 = "insert into machine_book (MachineId_id, UserId_id, ValidTime, EndTime) values ($Machine_ID, $Booker_ID[0], ADDTIME(now(), '00:30:00'), ADDTIME(now(), '00:50:00'))";//해당 세탁기 정보 업뎃
+$query6 = "update account_user set Penalty = Penalty + 1 WHERE id = $Booker_ID[0]";
+
+if (empty($Machine_EndTime[0])) {
+  if($Current_Time > $ValidTime[0] ){
+    $connect->query($query6);
+    $connect->query($query5);
+    echo 'NoShow_JustUse';
+  } elseif ($Current_Time > $UsableTime){
+    if ($Booker_Card[0] == $Current_User) {
+      $connect->query($query5);
+      echo 'Match';
+    } else {
+      echo 'Booker_Existing';
+    }
+  } else {
+    echo 'Still_Using';
+  }
+} elseif($Machine_EndTime[0] < $Current_Time) {
+  $connect->query($query5);
+  echo 'NoBooker_JustUse';
+} else {
+  echo 'StillUsing';
+}
+
  ?>
